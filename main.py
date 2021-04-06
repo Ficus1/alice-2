@@ -104,6 +104,10 @@ def play_game(res, req):
     sessionStorage[user_id]['suggests'] = [
         "Помощь",
     ]
+    if req["request"]['command'] == 'помощь':
+        res['response']['text'] = 'Игра угадай город.' \
+                                  'Алиса загадывает город в картинке, а вам его надо угадать'
+        return
     res['response']['buttons'] = get_suggests(user_id)
     if attempt == 1:
         city = random.choice(list(cities))
