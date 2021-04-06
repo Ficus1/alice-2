@@ -1,5 +1,3 @@
-import os
-import requests
 from flask import Flask, request
 import logging
 import json
@@ -10,9 +8,9 @@ app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
 cities = {
-    'москва': ['965417/d169473dcf7d60b49779', '997614/c3bfd8d0cf1f927c3536'],
-    'нью-йорк': ['997614/7883ae4b83fa962f6ebc', '965417/92ef8e7dcf948555a2d4'],
-    'париж': ["965417/ec5de23d2197d87f52f7", '965417/fbc785fe79f115238cae']
+    'москва': ['1540737/daa6e420d33102bf6947', '213044/7df73ae4cc715175059e'],
+    'нью-йорк': ['1652229/728d5c86707054d4745f', '1030494/aca7ed7acefde2606bdc'],
+    'париж': ["1652229/f77136c2364eb90a3ea8", '123494/aca7ed7acefd12e606bdc']
 }
 
 sessionStorage = {}
@@ -65,9 +63,14 @@ def handle_dialog(res, req):
                 }
             ]
     else:
+        # У нас уже есть имя, и теперь мы ожидаем ответ на предложение сыграть.
+        # В sessionStorage[user_id]['game_started'] хранится True или False в зависимости от того,
+        # начал пользователь игру или нет.
         if not sessionStorage[user_id]['game_started']:
             # игра не начата, значит мы ожидаем ответ на предложение сыграть.
             if 'да' in req['request']['nlu']['tokens']:
+                # если пользователь согласен, то проверяем не отгадал ли он уже все города.
+                # По схеме можно увидеть, что здесь окажутся и пользователи, которые уже отгадывали города
                 if len(sessionStorage[user_id]['guessed_cities']) == 3:
                     # если все три города отгаданы, то заканчиваем игру
                     res['response']['text'] = 'Ты отгадал все города!'
@@ -101,21 +104,15 @@ def handle_dialog(res, req):
 def play_game(res, req):
     user_id = req['session']['user_id']
     attempt = sessionStorage[user_id]['attempt']
-    if req["request"]['command'] == 'помощь':
-        res['response']['text'] = 'Игра угадай город.' \
-                                  'Алиса загадывает город в картинке, а вам его надо угадать'
-        return
-    sessionStorage[user_id]['suggests'] = [
-        "Помощь",
-    ]
-    res['response']['buttons'] = get_suggests(user_id)
     if attempt == 1:
+        # если попытка первая, то случайным образом выбираем город для гадания
         city = random.choice(list(cities))
+        # выбираем его до тех пор пока не выбираем город, которого нет в sessionStorage[user_id]['guessed_cities']
         while city in sessionStorage[user_id]['guessed_cities']:
             city = random.choice(list(cities))
+        # записываем город в информацию о пользователе
         sessionStorage[user_id]['city'] = city
-        sessionStorage[user_id]['country'] = get_country(city)
-        sessionStorage[user_id]['city_guessed'] = False
+        # добавляем в ответ картинку
         res['response']['card'] = {}
         res['response']['card']['type'] = 'BigImage'
         res['response']['card']['title'] = 'Что это за город?'
@@ -124,37 +121,30 @@ def play_game(res, req):
     else:
         # сюда попадаем, если попытка отгадать не первая
         city = sessionStorage[user_id]['city']
-        guessed = sessionStorage[user_id]["city_guessed"]
-        country = sessionStorage[user_id]['country']
         # проверяем есть ли правильный ответ в сообщение
-        if get_city(req) == city and not guessed:
-            res['response']['text'] = f"Правильно, {sessionStorage[user_id]['first_name']}!\n" \
-                                      f"https://yandex.ru/maps/?mode=search&text={city}\n" \
-                                      f"В какой стране находится город, {sessionStorage[user_id]['first_name']}"
+        if get_city(req) == city:
+            # если да, то добавляем город к sessionStorage[user_id]['guessed_cities'] и
+            # отправляем пользователя на второй круг. Обратите внимание на этот шаг на схеме.
+            res['response']['text'] = 'Правильно! Сыграем ещё?'
             sessionStorage[user_id]['guessed_cities'].append(city)
-            sessionStorage[user_id]['city_guessed'] = True
-            return
-        elif get_country(city).lower() == country.lower():
-            res['response']['text'] = f"Правильно, {sessionStorage[user_id]['first_name']}! Сыгарем еще?"
-            sessionStorage[user_id]["city_guessed"] = False
             sessionStorage[user_id]['game_started'] = False
+            return
         else:
             # если нет
             if attempt == 3:
-                if not guessed:
-                    res['response']['text'] = f"Вы пытались. Это {city.title()}. {sessionStorage[user_id]['first_name']}"
-                    sessionStorage[user_id]['guessed_cities'].append(city)
-                    return
-                else:
-                    res['response']['text'] = f"Вы пытались. Это {country}. {sessionStorage[user_id]['first_name']}, cыграем ещё?"
-                    sessionStorage[user_id]['game_started'] = False
-                    sessionStorage[user_id]["city_guessed"] = False
-                    return
+                # если попытка третья, то значит, что все картинки мы показали.
+                # В этом случае говорим ответ пользователю,
+                # добавляем город к sessionStorage[user_id]['guessed_cities'] и отправляем его на второй круг.
+                # Обратите внимание на этот шаг на схеме.
+                res['response']['text'] = f'Вы пытались. Это {city.title()}. Сыграем ещё?'
+                sessionStorage[user_id]['game_started'] = False
+                sessionStorage[user_id]['guessed_cities'].append(city)
+                return
             else:
                 # иначе показываем следующую картинку
                 res['response']['card'] = {}
                 res['response']['card']['type'] = 'BigImage'
-                res['response']['card']['title'] = f"Неправильно, {sessionStorage[user_id]['first_name']}. Вот тебе дополнительное фото"
+                res['response']['card']['title'] = 'Неправильно. Вот тебе дополнительное фото'
                 res['response']['card']['image_id'] = cities[city][attempt - 1]
                 res['response']['text'] = 'А вот и не угадал!'
     # увеличиваем номер попытки доля следующего шага
@@ -180,35 +170,5 @@ def get_first_name(req):
             return entity['value'].get('first_name', None)
 
 
-def get_suggests(user_id):
-    session = sessionStorage[user_id]
-
-    # Выбираем две первые подсказки из массива.
-    suggests = [
-        {'title': suggest, 'hide': True}
-        for suggest in session['suggests']
-    ]
-
-    return suggests
-
-
-def get_country(city_name):
-    try:
-        url = "https://geocode-maps.yandex.ru/1.x/"
-        params = {
-            "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
-            'geocode': city_name,
-            'format': 'json'
-        }
-        data = requests.get(url, params).json()
-        # все отличие тут, мы получаем имя страны
-        return data['response']['GeoObjectCollection'][
-            'featureMember'][0]['GeoObject']['metaDataProperty'][
-            'GeocoderMetaData']['AddressDetails']['Country']['CountryName']
-    except Exception as e:
-        return e
-
-
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run()
