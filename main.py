@@ -145,8 +145,8 @@ def play_game(res, req):
                     sessionStorage[user_id]['guessed_cities'].append(city)
                     return
                 else:
-                    res['response'][
-                        'text'] = f"Вы пытались. Это {country}. {sessionStorage[user_id]['first_name']}, cыграем ещё?"
+                    res['response']['text'] = f"Вы пытались. Это {country}. {sessionStorage[user_id]['first_name']}, cыграем ещё?"
+                    sessionStorage[user_id]['game_started'] = False
             else:
                 # иначе показываем следующую картинку
                 res['response']['card'] = {}
