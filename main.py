@@ -134,7 +134,7 @@ def play_game(res, req):
             sessionStorage[user_id]['guessed_cities'].append(city)
             sessionStorage[user_id]['city_guessed'] = True
             return
-        elif get_country(city) == country:
+        elif get_country(city).lower() == country.lower():
             res['response']['text'] = f"Правильно, {sessionStorage[user_id]['first_name']}! Сыгарем еще?"
             sessionStorage[user_id]['game_started'] = False
         else:
@@ -147,6 +147,7 @@ def play_game(res, req):
                 else:
                     res['response']['text'] = f"Вы пытались. Это {country}. {sessionStorage[user_id]['first_name']}, cыграем ещё?"
                     sessionStorage[user_id]['game_started'] = False
+                    return 
             else:
                 # иначе показываем следующую картинку
                 res['response']['card'] = {}
