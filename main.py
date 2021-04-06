@@ -1,6 +1,6 @@
 import os
 import requests
-from flask import Flask
+from flask import Flask, request
 import logging
 import json
 import random
