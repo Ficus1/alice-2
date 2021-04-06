@@ -1,3 +1,5 @@
+import os
+
 from flask import Flask, request
 import logging
 import json
@@ -118,14 +120,15 @@ def play_game(res, req):
         city = sessionStorage[user_id]['city']
         # проверяем есть ли правильный ответ в сообщение
         if get_city(req) == city:
-            res['response']['text'] = 'Правильно! Сыграем ещё?'
+            res['response']['text'] = f"Правильно, {sessionStorage[user_id]['first_name']}! Сыграем ещё?\n" \
+                                      f"https://yandex.ru/maps/?mode=search&text={city}"
             sessionStorage[user_id]['guessed_cities'].append(city)
             sessionStorage[user_id]['game_started'] = False
             return
         else:
             # если нет
             if attempt == 3:
-                res['response']['text'] = f'Вы пытались. Это {city.title()}. Сыграем ещё?'
+                res['response']['text'] = f"Вы пытались. Это {city.title()}. {sessionStorage[user_id]['first_name']}, cыграем ещё?"
                 sessionStorage[user_id]['game_started'] = False
                 sessionStorage[user_id]['guessed_cities'].append(city)
                 return
@@ -133,7 +136,7 @@ def play_game(res, req):
                 # иначе показываем следующую картинку
                 res['response']['card'] = {}
                 res['response']['card']['type'] = 'BigImage'
-                res['response']['card']['title'] = 'Неправильно. Вот тебе дополнительное фото'
+                res['response']['card']['title'] = f"Неправильно, {sessionStorage[user_id]['first_name']}. Вот тебе дополнительное фото"
                 res['response']['card']['image_id'] = cities[city][attempt - 1]
                 res['response']['text'] = 'А вот и не угадал!'
     # увеличиваем номер попытки доля следующего шага
@@ -172,4 +175,5 @@ def get_suggests(user_id):
 
 
 if __name__ == '__main__':
-    app.run()
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
