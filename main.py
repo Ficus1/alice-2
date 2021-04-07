@@ -39,8 +39,6 @@ def handle_dialog(res, req):
         res['response']['text'] = 'Привет! Назови своё имя!'
         sessionStorage[user_id] = {
             'first_name': None,  # здесь будет храниться имя
-            'country': None,
-            'city_guessed': False,
             'game_started': False  # здесь информация о том, что пользователь начал игру. По умолчанию False
         }
         return
@@ -77,6 +75,7 @@ def handle_dialog(res, req):
                 else:
                     # если есть неотгаданные города, то продолжаем игру
                     sessionStorage[user_id]['game_started'] = True
+                    sessionStorage[user_id]['city_guessed']= False
                     # номер попытки, чтобы показывать фото по порядку
                     sessionStorage[user_id]['attempt'] = 1
                     # функция, которая выбирает город для игры и показывает фото
@@ -131,8 +130,8 @@ def play_game(res, req):
         # проверяем есть ли правильный ответ в сообщение
         if get_city(req) == city and not guessed:
             res['response']['text'] = f"Правильно, {sessionStorage[user_id]['first_name']}!\n" \
-                                      f"https://yandex.ru/maps/?mode=search&text={city}\n" \
-                                      f"В какой стране находится город, {sessionStorage[user_id]['first_name']}"
+                                      f"https://yandex.ru/maps/?mode=search&text={city} \n" \
+                                      f"В какой стране находится этот город, {sessionStorage[user_id]['first_name']}"
             sessionStorage[user_id]['guessed_cities'].append(city)
             sessionStorage[user_id]['city_guessed'] = True
             return
