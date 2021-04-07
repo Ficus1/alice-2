@@ -158,6 +158,8 @@ def play_game(res, req):
                 res['response']['card']['title'] = f"Неправильно, {sessionStorage[user_id]['first_name']}. Вот тебе дополнительное фото"
                 res['response']['card']['image_id'] = cities[city][attempt - 1]
                 res['response']['text'] = 'А вот и не угадал!'
+            else:
+                res['response']['text'] = f"Неправильно, {sessionStorage[user_id]['first_name']}! попробуйте еще"
     # увеличиваем номер попытки доля следующего шага
     sessionStorage[user_id]['attempt'] += 1
 
