@@ -1,4 +1,5 @@
-# import requests
+import os
+import requests
 from flask import Flask, request
 import logging
 import json
@@ -74,6 +75,7 @@ def handle_dialog(res, req):
                 else:
                     # если есть неотгаданные города, то продолжаем игру
                     sessionStorage[user_id]['game_started'] = True
+                    sessionStorage[user_id]['city_guessed']= False
                     # номер попытки, чтобы показывать фото по порядку
                     sessionStorage[user_id]['attempt'] = 1
                     # функция, которая выбирает город для игры и показывает фото
@@ -100,6 +102,10 @@ def handle_dialog(res, req):
 def play_game(res, req):
     user_id = req['session']['user_id']
     attempt = sessionStorage[user_id]['attempt']
+    if req["request"]['command'] == 'помощь':
+        res['response']['text'] = 'Игра угадай город.\n' \
+                                  'Алиса загадывает город в картинке, а вам его надо угадать'
+        return
     sessionStorage[user_id]['suggests'] = [
         "Помощь",
     ]
@@ -109,6 +115,8 @@ def play_game(res, req):
         while city in sessionStorage[user_id]['guessed_cities']:
             city = random.choice(list(cities))
         sessionStorage[user_id]['city'] = city
+        sessionStorage[user_id]['country'] = get_country(city)
+        sessionStorage[user_id]['city_guessed'] = False
         res['response']['card'] = {}
         res['response']['card']['type'] = 'BigImage'
         res['response']['card']['title'] = 'Что это за город?'
@@ -117,20 +125,32 @@ def play_game(res, req):
     else:
         # сюда попадаем, если попытка отгадать не первая
         city = sessionStorage[user_id]['city']
+        guessed = sessionStorage[user_id]["city_guessed"]
+        country = sessionStorage[user_id]['country']
         # проверяем есть ли правильный ответ в сообщение
-        if get_city(req) == city:
-            res['response']['text'] = f"Правильно, {sessionStorage[user_id]['first_name']}! Сыграем ещё?\n" \
-                                      f"https://yandex.ru/maps/?mode=search&text={city}"
+        if get_city(req) == city and not guessed:
+            res['response']['text'] = f"Правильно, {sessionStorage[user_id]['first_name']}!\n" \
+                                      f"https://yandex.ru/maps/?mode=search&text={city} \n" \
+                                      f"В какой стране находится этот город, {sessionStorage[user_id]['first_name']}"
             sessionStorage[user_id]['guessed_cities'].append(city)
-            sessionStorage[user_id]['game_started'] = False
+            sessionStorage[user_id]['city_guessed'] = True
             return
+        elif get_country(city).lower() == country.lower() and guessed:
+            res['response']['text'] = f"Правильно, {sessionStorage[user_id]['first_name']}! Сыгарем еще?"
+            sessionStorage[user_id]["city_guessed"] = False
+            sessionStorage[user_id]['game_started'] = False
         else:
             # если нет
             if attempt == 3:
-                res['response']['text'] = f"Вы пытались. Это {city.title()}. {sessionStorage[user_id]['first_name']}, cыграем ещё?"
-                sessionStorage[user_id]['game_started'] = False
-                sessionStorage[user_id]['guessed_cities'].append(city)
-                return
+                if not guessed:
+                    res['response']['text'] = f"Вы пытались. Это {city.title()}. {sessionStorage[user_id]['first_name']}"
+                    sessionStorage[user_id]['guessed_cities'].append(city)
+                    return
+                else:
+                    res['response']['text'] = f"Вы пытались. Это {country}. {sessionStorage[user_id]['first_name']}, cыграем ещё?"
+                    sessionStorage[user_id]['game_started'] = False
+                    sessionStorage[user_id]["city_guessed"] = False
+                    return
             else:
                 # иначе показываем следующую картинку
                 res['response']['card'] = {}
@@ -173,5 +193,23 @@ def get_suggests(user_id):
     return suggests
 
 
+def get_country(city_name):
+    try:
+        url = "https://geocode-maps.yandex.ru/1.x/"
+        params = {
+            "apikey": "40d1649f-0493-4b70-98ba-98533de7710b",
+            'geocode': city_name,
+            'format': 'json'
+        }
+        data = requests.get(url, params).json()
+        # все отличие тут, мы получаем имя страны
+        return data['response']['GeoObjectCollection'][
+            'featureMember'][0]['GeoObject']['metaDataProperty'][
+            'GeocoderMetaData']['AddressDetails']['Country']['CountryName']
+    except Exception as e:
+        return e
+
+
 if __name__ == '__main__':
-    app.run()
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
