@@ -151,7 +151,7 @@ def play_game(res, req):
                     sessionStorage[user_id]['game_started'] = False
                     sessionStorage[user_id]["city_guessed"] = False
                     return
-            else:
+            elif not guessed:
                 # иначе показываем следующую картинку
                 res['response']['card'] = {}
                 res['response']['card']['type'] = 'BigImage'
